@@ -82,6 +82,7 @@ class Hero(pygame.sprite.Sprite):
                 break
             else:
                 self.on_the_ground = False
+
         if not self.on_the_ground:
             self.rect = self.rect.move(0, 1)
         if pygame.key.get_pressed()[pygame.K_LEFT] and 0 < self.rect.x:
