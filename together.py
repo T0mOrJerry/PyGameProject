@@ -1,5 +1,6 @@
 import pygame
 import os
+import shutil
 import sys
 
 
@@ -17,8 +18,16 @@ backgrounds = pygame.sprite.Group()
 main = pygame.sprite.Group()
 prizes = pygame.sprite.Group()
 numbers = pygame.sprite.Group()
-fps = 60
+monsters = pygame.sprite.Group()
+fps = 120
 jump_height = 100
+###########
+cur_level = (1, 1)
+###########
+copy_level = os.listdir(f"all_levels/{cur_level[0]}")[1:]
+copy_level.sort(key=lambda x: int(x[-1]))
+for i in range(len(copy_level)):
+    shutil.copy(f"all_levels/{cur_level[0]}/{copy_level[i]}", f'all_levels/Copy/{i + 1}')
 
 
 def load_image(name, colorkey=None):
@@ -47,7 +56,14 @@ def load_level(name):
             for j in i[:-1]:
                 col.append(j)
             e.append(col)
-    return e
+    for i in range(len(e)):
+        for j in range(len(e[0])):
+            if e[i][j] == "*":
+                Brick(bricks, j * 80, i * 80 + 25)
+            if e[i][j] == "@":
+                AnimatedSprite(prizes, coin_image, 10, 1, j, i)
+            # if e[i][j] == "&":
+            #     Blast(monsters, blast_image, 8, 8, j, i)
 
 
 class Sky(pygame.sprite.Sprite):
@@ -128,7 +144,7 @@ class Hero(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect =self.rect.move(0, 400)
         self.mask = pygame.mask.from_surface(self.image)
-        self.vy = 1
+        self.vy = 10
         self.vx = 0
         self.flip = False
         self.jump = False
@@ -155,6 +171,7 @@ class Hero(pygame.sprite.Sprite):
             self.flip = False
 
     def update(self, *args):
+        global cur_level
         self.obstacle_below = False
         self.obstacle_on_the_left = False
         self.obstacle_on_the_right = False
@@ -166,18 +183,48 @@ class Hero(pygame.sprite.Sprite):
         self.right_bottom_y = self.rect.y + self.rect.height
         self.vx = 0
         self.vy = 0
+        #######
+        if self.right_bottom_x >= width:
+            cur_level = (cur_level[0], cur_level[1] + 1)
+            full_levelname = os.path.join(f'all_levels/Copy', f'{cur_level[1]}')
+            if not os.path.isfile(full_levelname):
+                # Здесь можно закончить уровень и вывести итоги
+                self.rect.x = width - self.rect.width
+                cur_level = (cur_level[0], cur_level[1] - 1)
+            else:
+                self.rect.x = 0
+                for i in bricks:
+                    i.kill()
+                for i in prizes:
+                    i.kill()
+                load_level(full_levelname)
+        if self.rect.x < 0:
+            if cur_level[1] > 1:
+                cur_level = (cur_level[0], cur_level[1] - 1)
+                full_levelname = os.path.join(f'all_levels/Copy', f'{cur_level[1]}')
+                for i in bricks:
+                    i.kill()
+                for i in prizes:
+                    i.kill()
+                self.rect.x = width - self.rect.width
+                load_level(full_levelname)
+            else:
+                self.rect.x = 0
+                self.vx = 0
+        #########
         if pygame.sprite.collide_mask(self, ground):
             self.obstacle_below = True
         if not self.obstacle_below:
-            self.vy = 2
-        if pygame.key.get_pressed()[pygame.K_LEFT] and 0 < self.rect.x and not self.obstacle_on_the_left:
+            self.vy = 1
+        #############
+        if pygame.key.get_pressed()[pygame.K_LEFT] and not self.obstacle_on_the_left:
             self.left()
             self.vx = -2
         if pygame.key.get_pressed()[pygame.K_RIGHT] and not self.obstacle_on_the_right:
             self.right()
             self.vx = 2
         if args and args[0].type == pygame.KEYDOWN:
-            if args and args[0].key == pygame.K_SPACE:
+            if args and args[0].key == pygame.K_SPACE or args[0].key == pygame.K_UP:
                 if self.obstacle_below:
                     if not self.jump:
                         self.finish_point = self.rect.y - jump_height
@@ -210,6 +257,8 @@ class AnimatedSprite(pygame.sprite.Sprite):
         self.rect = self.rect.move(x * 80, y * 80)
         self.max_fps = fps // 10
         self.fps = 0
+        self.pos_x = y
+        self.pos_y = x
 
     def cut_sheet(self, sheet, columns, rows):
         self.rect = pygame.Rect(0, 0, sheet.get_width() // columns, sheet.get_height() // rows)
@@ -226,6 +275,19 @@ class AnimatedSprite(pygame.sprite.Sprite):
             if pygame.sprite.collide_mask(self, hero):
                 numbers.update()
                 self.kill()
+                ##########
+                with open("all_levels/menu/info", "r") as f:
+                    money = int(f.readline())
+                with open("all_levels/menu/info", "w") as f:
+                    print(money + 1, file=f)
+                with open(f"all_levels/Copy/{cur_level[1]}", "r") as file:
+                    lvl_c = file.readlines()
+                st = lvl_c.pop(self.pos_x)
+                st = st[:self.pos_y] + "." + st[(self.pos_y + 1):]
+                lvl_c.insert(self.pos_x, st)
+                with open(f"all_levels/Copy/{cur_level[1]}", "w") as file:
+                    for i in lvl_c:
+                        file.write(i)
         self.fps = (self.fps + 1) % self.max_fps
 
 
@@ -251,29 +313,37 @@ class Numbers(pygame.sprite.Sprite):
         self.image = self.frames[self.cur_frame]
 
 
+class Blast(AnimatedSprite):
+    def __init__(self):
+        super(Blast, self).__init__()
+    def update(self):
+        if not self.fps:
+            self.cur_frame = (self.cur_frame + 1) % len(self.frames)
+            self.image = self.frames[self.cur_frame]
+            if pygame.sprite.collide_mask(self, hero):
+                sys.exit()
+        self.fps = (self.fps + 1) % self.max_fps
+
+
 if __name__ == '__main__':
     try:
         running = True
         coin_image = load_image("coin.png", -1)
         coin_image = pygame.transform.scale(coin_image, (880, 80))
+        #blast_image = load_image("blast.png")
         clock = pygame.time.Clock()
         ground = Ground(grounds)
         hero = Hero(characters)
         number = Numbers(numbers)
-        level = load_level("level")
-        for i in range(len(level)):
-            for j in range(len(level[0])):
-                if level[i][j] == "*":
-                    Brick(bricks, j * 80, i * 80 + 25)
-                if level[i][j] == "@":
-                    coin = AnimatedSprite(prizes, coin_image, 10, 1, j, i)
+        #############
+        load_level(f'all_levels/Copy/{cur_level[1]}')
         sky = Sky(backgrounds)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
+                    if event.key == pygame.K_SPACE or event.key == pygame.K_UP:
                         for i in characters:
                             i.update(event)
             screen.fill((255, 255, 255))
@@ -283,6 +353,8 @@ if __name__ == '__main__':
             characters.draw(screen)
             characters.update()
             prizes.draw(screen)
+            monsters.draw(screen)
+            monsters.update()
             prizes.update()
             bricks.draw(screen)
             pygame.display.flip()
@@ -290,5 +362,3 @@ if __name__ == '__main__':
         pygame.quit()
     except ValueError:
         print("Неправильный формат ввода")
-
-
