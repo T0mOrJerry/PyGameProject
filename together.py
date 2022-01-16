@@ -324,41 +324,41 @@ class Blast(AnimatedSprite):
                 sys.exit()
         self.fps = (self.fps + 1) % self.max_fps
 
-
-if __name__ == '__main__':
-    try:
-        running = True
-        coin_image = load_image("coin.png", -1)
-        coin_image = pygame.transform.scale(coin_image, (880, 80))
-        #blast_image = load_image("blast.png")
-        clock = pygame.time.Clock()
-        ground = Ground(grounds)
-        hero = Hero(characters)
-        number = Numbers(numbers)
-        #############
-        load_level(f'all_levels/Copy/{cur_level[1]}')
-        sky = Sky(backgrounds)
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE or event.key == pygame.K_UP:
-                        for i in characters:
-                            i.update(event)
-            screen.fill((255, 255, 255))
-            backgrounds.draw(screen)
-            grounds.draw(screen)
-            numbers.draw(screen)
-            characters.draw(screen)
-            characters.update()
-            prizes.draw(screen)
-            monsters.draw(screen)
-            monsters.update()
-            prizes.update()
-            bricks.draw(screen)
-            pygame.display.flip()
-            clock.tick(fps)
-        pygame.quit()
-    except ValueError:
-        print("Неправильный формат ввода")
+def game():
+    if __name__ == '__main__':
+        try:
+            running = True
+            coin_image = load_image("coin.png", -1)
+            coin_image = pygame.transform.scale(coin_image, (880, 80))
+            #blast_image = load_image("blast.png")
+            clock = pygame.time.Clock()
+            ground = Ground(grounds)
+            hero = Hero(characters)
+            number = Numbers(numbers)
+            #############
+            load_level(f'all_levels/Copy/{cur_level[1]}')
+            sky = Sky(backgrounds)
+            while running:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_SPACE or event.key == pygame.K_UP:
+                            for i in characters:
+                                i.update(event)
+                screen.fill((255, 255, 255))
+                backgrounds.draw(screen)
+                grounds.draw(screen)
+                numbers.draw(screen)
+                characters.draw(screen)
+                characters.update()
+                prizes.draw(screen)
+                monsters.draw(screen)
+                monsters.update()
+                prizes.update()
+                bricks.draw(screen)
+                pygame.display.flip()
+                clock.tick(fps)
+            pygame.quit()
+        except ValueError:
+            print("Неправильный формат ввода")
