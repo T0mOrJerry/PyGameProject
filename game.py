@@ -5,6 +5,13 @@ import shutil
 import csv
 
 
+def clear_copy():
+    copy_level = os.listdir(f"all_levels/{cur_level[0]}")[1:]
+    copy_level.sort(key=lambda x: int(x[-1]))
+    for i in range(len(copy_level)):
+        shutil.copy(f"all_levels/{cur_level[0]}/{copy_level[i]}", f'all_levels/Copy/{i + 1}')
+
+
 pygame.init()
 w, h = 1280, 720
 size = width, height = w, h
@@ -25,7 +32,7 @@ co = pygame.sprite.Group()
 men = pygame.sprite.Group()
 dead = pygame.sprite.Group()
 location = 'menu'
-fps = 120
+fps = 60
 jump_height = 110
 cur_level = (1, 1)
 menu_page = 'all_levels/menu/menu_main'
@@ -37,10 +44,12 @@ with open('all_levels/menu/skins.csv', encoding="utf8") as csvfile:
     reader = csv.reader(csvfile, delimiter=';', quotechar='"')
     for index, row in enumerate(reader):
         li.append(row)
-copy_level = os.listdir(f"all_levels/{cur_level[0]}")[1:]
-copy_level.sort(key=lambda x: int(x[-1]))
-for i in range(len(copy_level)):
-    shutil.copy(f"all_levels/{cur_level[0]}/{copy_level[i]}", f'all_levels/Copy/{i + 1}')
+levels = []
+with open('all_levels/menu/levels.csv', encoding="utf8") as csvfile:
+    reader = csv.reader(csvfile, delimiter=';', quotechar='"')
+    for index, row in enumerate(reader):
+        levels.append(row)
+clear_copy()
 
 
 def load_image(name, colorkey=None):
@@ -73,34 +82,38 @@ def load_level(name):
         for j in range(len(e[0])):
             if e[i][j] == "*":
                 Brick(bricks, j * 80, i * 80 + 25)
-            if e[i][j] == "@":
+            elif e[i][j] == "@":
                 AnimatedSprite(prizes, coin_image, 10, 1, j, i)
-            elif e[i][j] == "l":
-                LightBrick(bricks, j * 80, i * 80 + 25)
-            elif e[i][j] == "m":
-                MediumBrick(bricks, j * 80, i * 80 + 25)
-            elif e[i][j] == "h":
-                HardBrick(bricks, j * 80, i * 80 + 25)
-            elif e[i][j] == "e":
-                EvilBrick(bricks, j * 80, i * 80 + 25)
             elif e[i][j] == "+":
                 gear = Gear(others)
             elif e[i][j] in "123456":
                 Skin(bricks, j * 80, i * 80 + 25, int(e[i][j]) - 1)
+            elif e[i][j] in "lmhe":
+                LevelBrick(bricks, j * 80, i * 80 + 25, e[i][j])
             elif e[i][j] == "&":
                 Blast(monsters, blast_image, 9, 9, j, i)
 
 
-def reload_level():
-    global menu_page
-    hero.rect.x = 20
-    hero.right()
+def kill_all():
     for i in bricks:
         i.kill()
     for i in prizes:
         i.kill()
     for i in others:
         i.kill()
+    for i in monsters:
+        i.kill()
+    for i in men:
+        i.kill()
+
+
+def reload_level():
+    global menu_page, level_money
+    hero.rect.x = 40
+    hero.rect.y = 500
+    hero.right()
+    kill_all()
+    level_money = 0
     sky.image = load_image("sky_menu.png")
     load_level(menu_page)
 
@@ -142,23 +155,18 @@ def cost_print(screen, n, x, y, b):
 def death():
     global cur_level
     a = hero.image
+    kill_all()
     hero.image = load_image('RIP.png')
     hero.image = pygame.transform.scale(hero.image, (80, 80))
     characters.draw(screen)
     pygame.display.flip()
     pygame.time.wait(1000)
-    for i in bricks:
-        i.kill()
-    for i in prizes:
-        i.kill()
-    for i in monsters:
-        i.kill()
+    kill_all()
     load_level("all_levels/Copy/1")
     cur_level = (cur_level[0], 1)
     hero.image = a
     hero.rect.x = 0
     hero.rect.y = 500
-
 
 
 class Sky(pygame.sprite.Sprite):
@@ -243,158 +251,6 @@ class Brick(pygame.sprite.Sprite):
                     hero.obstacle_on_the_right = True
 
 
-class LightBrick(pygame.sprite.Sprite):
-    image = load_image("light_brick.png", -1)
-
-    def __init__(self, group, x, y):
-        super().__init__(group)
-        self.image = LightBrick.image
-        self.image = pygame.transform.scale(self.image, (80, 80))
-        self.rect = self.image.get_rect()
-        self.rect.x += x
-        self.rect.y += y
-        self.mask = pygame.mask.from_surface(self.image)
-        self.left_up_x = self.rect.x
-        self.left_up_y = self.rect.y
-        self.right_bottom_x = self.rect.x + self.rect.width
-        self.right_bottom_y = self.rect.y + self.rect.height
-
-    def update(self):
-        global menu_page, location, cur_level
-        if pygame.sprite.collide_mask(self, hero):
-            for i in bricks:
-                i.kill()
-            for i in prizes:
-                i.kill()
-            for i in others:
-                i.kill()
-            location = 'level'
-            hero.rect.x = 0
-            hero.rect.y = 400
-            cur_level = (1, 1)
-            sky.image = load_image("sky.png")
-            level_money = 0
-            load_level(f'all_levels/Copy/{cur_level[1]}')
-
-    def give_coords(self, x, y):
-        self.rect.x = x
-        self.rect.y = y
-
-
-class MediumBrick(pygame.sprite.Sprite):
-    image = load_image("medium_brick.png", -1)
-
-    def __init__(self, group, x, y):
-        super().__init__(group)
-        self.image = MediumBrick.image
-        self.image = pygame.transform.scale(self.image, (80, 80))
-        self.rect = self.image.get_rect()
-        self.rect.x += x
-        self.rect.y += y
-        self.mask = pygame.mask.from_surface(self.image)
-        self.left_up_x = self.rect.x
-        self.left_up_y = self.rect.y
-        self.right_bottom_x = self.rect.x + self.rect.width
-        self.right_bottom_y = self.rect.y + self.rect.height
-
-    def update(self):
-        global menu_page, location, cur_level
-        if pygame.sprite.collide_mask(self, hero):
-            for i in bricks:
-                i.kill()
-            for i in prizes:
-                i.kill()
-            for i in others:
-                i.kill()
-            location = 'level'
-            hero.rect.x = 0
-            hero.rect.y = 400
-            cur_level = (2, 1)
-            sky.image = load_image("sky.png")
-            level_money = 0
-            load_level(f'all_levels/Copy/{cur_level[1]}')
-
-    def give_coords(self, x, y):
-        self.rect.x = x
-        self.rect.y = y
-
-
-class HardBrick(pygame.sprite.Sprite):
-    image = load_image("hard_brick.png", -1)
-
-    def __init__(self, group, x, y):
-        super().__init__(group)
-        self.image = HardBrick.image
-        self.image = pygame.transform.scale(self.image, (80, 80))
-        self.rect = self.image.get_rect()
-        self.rect.x += x
-        self.rect.y += y
-        self.mask = pygame.mask.from_surface(self.image)
-        self.left_up_x = self.rect.x
-        self.left_up_y = self.rect.y
-        self.right_bottom_x = self.rect.x + self.rect.width
-        self.right_bottom_y = self.rect.y + self.rect.height
-
-    def update(self):
-        global menu_page, location, cur_level
-        if pygame.sprite.collide_mask(self, hero):
-            for i in bricks:
-                i.kill()
-            for i in prizes:
-                i.kill()
-            for i in others:
-                i.kill()
-            location = 'level'
-            hero.rect.x = 0
-            hero.rect.y = 400
-            cur_level = (3, 1)
-            sky.image = load_image("sky.png")
-            level_money = 0
-            load_level(f'all_levels/Copy/{cur_level[1]}')
-
-    def give_coords(self, x, y):
-        self.rect.x = x
-        self.rect.y = y
-
-
-class EvilBrick(pygame.sprite.Sprite):
-    image = load_image("evil_brick.png", -1)
-
-    def __init__(self, group, x, y):
-        super().__init__(group)
-        self.image = EvilBrick.image
-        self.image = pygame.transform.scale(self.image, (80, 80))
-        self.rect = self.image.get_rect()
-        self.rect.x += x
-        self.rect.y += y
-        self.mask = pygame.mask.from_surface(self.image)
-        self.left_up_x = self.rect.x
-        self.left_up_y = self.rect.y
-        self.right_bottom_x = self.rect.x + self.rect.width
-        self.right_bottom_y = self.rect.y + self.rect.height
-
-    def update(self):
-        global menu_page, location, cur_level
-        if pygame.sprite.collide_mask(self, hero):
-            for i in bricks:
-                i.kill()
-            for i in prizes:
-                i.kill()
-            for i in others:
-                i.kill()
-            location = 'level'
-            hero.rect.x = 0
-            hero.rect.y = 400
-            cur_level = (4, 1)
-            sky.image = load_image("sky.png")
-            level_money = 0
-            load_level(f'all_levels/Copy/{cur_level[1]}')
-
-    def give_coords(self, x, y):
-        self.rect.x = x
-        self.rect.y = y
-
-
 class Border(pygame.sprite.Sprite):
     def __init__(self, group, x1, y1, x2, y2):
         super().__init__(group)
@@ -464,7 +320,7 @@ class Hero(pygame.sprite.Sprite):
         if pygame.key.get_pressed()[pygame.K_LEFT] and not self.obstacle_on_the_left:
             self.left()
             self.vx = -2
-        if pygame.key.get_pressed()[pygame.K_RIGHT] and not self.obstacle_on_the_right:
+        elif pygame.key.get_pressed()[pygame.K_RIGHT] and not self.obstacle_on_the_right:
             self.right()
             self.vx = 2
         if args and args[0].type == pygame.KEYDOWN:
@@ -479,6 +335,9 @@ class Hero(pygame.sprite.Sprite):
             if self.rect.x <= 1 and menu_page != 'all_levels/menu/menu_main':
                 menu_page = 'all_levels/menu/menu_main'
                 reload_level()
+            if self.rect.x >= width:
+                menu_page = 'all_levels/menu/menu_main'
+                reload_level()
         else:
             if self.right_bottom_x >= width:
                 cur_level = (cur_level[0], cur_level[1] + 1)
@@ -489,23 +348,13 @@ class Hero(pygame.sprite.Sprite):
                     cur_level = (cur_level[0], cur_level[1] - 1)
                 else:
                     self.rect.x = 0
-                    for i in bricks:
-                        i.kill()
-                    for i in prizes:
-                        i.kill()
-                    for i in monsters:
-                        i.kill()
+                    kill_all()
                     load_level(full_levelname)
             if self.rect.x < 0:
                 if cur_level[1] > 1:
                     cur_level = (cur_level[0], cur_level[1] - 1)
                     full_levelname = os.path.join(f'all_levels/Copy', f'{cur_level[1]}')
-                    for i in bricks:
-                        i.kill()
-                    for i in prizes:
-                        i.kill()
-                    for i in monsters:
-                        i.kill()
+                    kill_all()
                     self.rect.x = width - self.rect.width
                     load_level(full_levelname)
                 else:
@@ -624,6 +473,49 @@ class Skin(pygame.sprite.Sprite):
                             writer.writerow(i)
 
 
+class LevelBrick(pygame.sprite.Sprite):
+
+    def __init__(self, group, x, y, n):
+        super().__init__(group)
+        if n == 'l':
+            self.a = 0
+        elif n == 'm':
+            self.a = 1
+        elif n == 'h':
+            self.a = 2
+        else:
+            self.a = 3
+        self.page = levels[self.a]
+        self.image = load_image(self.page[2], -1)
+        self.image = pygame.transform.scale(self.image, (80, 80))
+        self.rect = self.image.get_rect()
+        self.rect.x += x
+        self.rect.y += y
+        self.mask = pygame.mask.from_surface(self.image)
+        self.left_up_x = self.rect.x
+        self.left_up_y = self.rect.y
+        self.right_bottom_x = self.rect.x + self.rect.width
+        self.right_bottom_y = self.rect.y + self.rect.height
+
+
+    def update(self, *args):
+        global money
+        if args and args[0].type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(args[0].pos[0], args[0].pos[1]):
+                global menu_page, location, cur_level
+        if pygame.sprite.collide_mask(self, hero):
+            kill_all()
+            location = 'level'
+            hero.rect.x = 0
+            hero.rect.y = 400
+            cur_level = (int(self.page[1]), 1)
+            sky.image = load_image("sky.png")
+            menu_icon = MenuIcon(men)
+            level_money = 0
+            clear_copy()
+            load_level(f'all_levels/Copy/{cur_level[1]}')
+
+
 class MenuIcon(pygame.sprite.Sprite):
     image = load_image('menu_brick.png', -1)
 
@@ -642,22 +534,13 @@ class MenuIcon(pygame.sprite.Sprite):
 
 
     def update(self, *args):
-        global money
-        if args and args[0].type == pygame.MOUSEBUTTONDOWN:
-            if self.rect.collidepoint(args[0].pos[0], args[0].pos[1]):
-                print(True)
-
-
-class RIP(pygame.sprite.Sprite):
-    image = load_image("RIP.png")
-
-    def __init__(self, group, x, y):
-        super().__init__(group)
-        self.image = RIP.image
-        print(self.image.get_width(), self.image.get_height())
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y + self.rect.height
+        global menu_page, location
+        if location != 'menu':
+            if args and args[0].type == pygame.MOUSEBUTTONDOWN:
+                if self.rect.collidepoint(args[0].pos[0], args[0].pos[1]):
+                    menu_page = 'all_levels/menu/menu_level'
+                    location = 'menu'
+                    reload_level()
 
 
 class Blast(AnimatedSprite):
@@ -686,7 +569,6 @@ if __name__ == '__main__':
         clock = pygame.time.Clock()
         ground = Ground(grounds)
         hero = Hero(characters)
-        menu_icon = MenuIcon(men)
         #number = Numbers(numbers)
         #############
         load_level(menu_page)
@@ -708,7 +590,6 @@ if __name__ == '__main__':
                             i.update(event)
             screen.fill((255, 255, 255))
             backgrounds.draw(screen)
-            coins(screen)
             grounds.draw(screen)
             numbers.draw(screen)
             characters.draw(screen)
@@ -718,11 +599,13 @@ if __name__ == '__main__':
             monsters.update()
             prizes.update()
             co.draw(screen)
+            coins(screen)
             if location == 'menu':
                 others.draw(screen)
                 others.update()
             else:
                 men.draw(screen)
+            men.draw(screen)
             bricks.draw(screen)
             pygame.display.flip()
             clock.tick(fps)
