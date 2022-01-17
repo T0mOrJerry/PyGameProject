@@ -32,7 +32,7 @@ co = pygame.sprite.Group()
 men = pygame.sprite.Group()
 dead = pygame.sprite.Group()
 location = 'menu'
-fps = 60
+fps = 120
 jump_height = 110
 cur_level = (1, 1)
 menu_page = 'all_levels/menu/menu_main'
@@ -55,6 +55,13 @@ with open('all_levels/menu/trophy.csv', encoding="utf8") as csvfile:
     for index, row in enumerate(reader):
         trophies.append(row)
 clear_copy()
+curent_sound_number = 0
+main_channel = pygame.mixer.Channel(0)
+curent_sound = pygame.mixer.Sound(f"Data/music/0.mp3")
+main_channel.play(curent_sound)
+main_channel.set_volume(0.3)
+jump_sound = pygame.mixer.Sound("Data/music/jump.mp3")
+death_sound = pygame.mixer.Sound("Data/music/mario-death.mp3")
 
 
 def load_image(name, colorkey=None):
@@ -95,10 +102,17 @@ def load_level(name):
                 Skin(bricks, j * 80, i * 80 + 25, int(e[i][j]) - 1)
             elif e[i][j] in "lmhe":
                 LevelBrick(bricks, j * 80, i * 80 + 25, e[i][j])
+            elif e[i][j] in "rw":
+                k = Exit(others, j * 80, i * 80 + 25, e[i][j])
+                k.rect.y -= 20
             elif e[i][j] == "s":
                 Star(bricks, j * 80, i * 80 + 25)
+            elif e[i][j] == "o":
+                a = Portal(monsters, portal_image, 4, 1, j, i)
+                a.rect.x = a.rect.x - 50
+                a.rect.y = a.rect.y - 100
             elif e[i][j] in "dbigp":
-                Trophy(bricks, j * 80, i * 80 + 25, e[i][j])
+                Trophy(bricks, j * 80, i * 80 + 25, e[i][j], i, j)
             elif e[i][j] == "&":
                 Blast(monsters, blast_image, 9, 9, j, i)
 
@@ -160,6 +174,8 @@ def cost_print(screen, n, x, y, b):
 
 
 def death():
+    main_channel.pause()
+    death_sound.play()
     global cur_level
     a = hero.image
     kill_all()
@@ -167,13 +183,33 @@ def death():
     hero.image = pygame.transform.scale(hero.image, (80, 80))
     characters.draw(screen)
     pygame.display.flip()
-    pygame.time.wait(1000)
+    pygame.time.wait(2000)
     kill_all()
     load_level("all_levels/Copy/1")
     cur_level = (cur_level[0], 1)
     hero.image = a
     hero.rect.x = 0
     hero.rect.y = 500
+    main_channel.unpause()
+
+
+def end():
+    ###########################################
+    global menu_page, location
+    monsters.draw(screen)
+    characters.draw(screen)
+    pygame.display.flip()
+    pygame.time.wait(2000)
+    kill_all()
+    location = 'menu'
+    menu_page = 'all_levels/results'
+    reload_level()
+    sky.image = load_image('sky.png')
+    hero.rect.x = width // 2 - hero.rect.width
+    hero.rect.y = 500
+    ###########################################
+
+
 
 
 class Sky(pygame.sprite.Sprite):
@@ -334,6 +370,7 @@ class Hero(pygame.sprite.Sprite):
             if args and args[0].key == pygame.K_SPACE or args[0].key == pygame.K_UP:
                 if self.obstacle_below:
                     if not self.jump:
+                        jump_sound.play()
                         self.finish_point = self.rect.y - jump_height
                         self.first_jump = True
                         self.up = True
@@ -342,10 +379,10 @@ class Hero(pygame.sprite.Sprite):
             if self.rect.x <= 1 and menu_page != 'all_levels/menu/menu_main':
                 menu_page = 'all_levels/menu/menu_main'
                 reload_level()
-            if self.rect.x <= 1 and menu_page == 'all_levels/menu/menu_main':
+            if self.rect.x <= 1 and (menu_page == 'all_levels/menu/menu_main' or menu_page == 'all_levels/results'):
                 if self.vx < 0:
                     self.vx = 0
-            if self.right_bottom_x >= width and menu_page == 'all_levels/menu/menu_main':
+            if self.right_bottom_x >= width and (menu_page == 'all_levels/menu/menu_main' or menu_page == 'all_levels/results'):
                 if self.vx > 0:
                     self.vx = 0
             if self.rect.x >= width:
@@ -545,8 +582,10 @@ class MenuIcon(pygame.sprite.Sprite):
 
     def update(self, *args):
         global menu_page, location
-        if location != 'menu':
+
+        if location != 'menu' or menu_page == 'all_levels/results':
             if args and args[0].type == pygame.MOUSEBUTTONDOWN:
+                print(location, menu_page)
                 if self.rect.collidepoint(args[0].pos[0], args[0].pos[1]):
                     menu_page = 'all_levels/menu/menu_level'
                     location = 'menu'
@@ -595,8 +634,10 @@ class Star(pygame.sprite.Sprite):
 
 class Trophy(pygame.sprite.Sprite):
 
-    def __init__(self, group, x, y, n):
+    def __init__(self, group, x, y, n, i, j):
         super().__init__(group)
+        self.i = i
+        self.j = j
         if n == 'd':
             self.a = 0
         elif n == 'b':
@@ -608,7 +649,7 @@ class Trophy(pygame.sprite.Sprite):
         else:
             self.a = 4
         self.page = trophies[self.a]
-        self.image = load_image(self.page[2], -1)
+        self.image = load_image(self.page[2])
         self.image = pygame.transform.scale(self.image, (80, 80))
         self.rect = self.image.get_rect()
         self.rect.x += x
@@ -619,11 +660,78 @@ class Trophy(pygame.sprite.Sprite):
         self.right_bottom_x = self.rect.x + self.rect.width
         self.right_bottom_y = self.rect.y + self.rect.height
 
-
-    def update(self, *args):
+    def update(self):
         global menu_page, location, cur_level
-        if pygame.sprite.collide_mask(self, hero) and self.a != 0:
+        if pygame.sprite.collide_mask(self, hero) and menu_page != 'all_levels/menu/menu_trophies':
             full_levelname = os.path.join(f'all_levels/', f'{cur_level[0]}/level{cur_level[0]}.{cur_level[1]}')
+            with open(full_levelname, 'rt', encoding='utf8') as file:
+                rows = file.readlines()
+                e = []
+                for i in rows:
+                    col = []
+                    for j in i[:-1]:
+                        col.append(j)
+                    e.append(col)
+            e[self.i][self.j] = '.'
+            with open(full_levelname, 'wt', encoding='utf8') as file:
+                for i in e:
+                    print(''.join(i), file=file)
+            with open('all_levels/menu/menu_trophies', 'rt', encoding='utf8') as file:
+                rows = file.readlines()
+                e = []
+                for i in rows:
+                    col = []
+                    for j in i[:-1]:
+                        col.append(j)
+                    e.append(col)
+            if self.a == 1:
+                e[4][3] = 'b'
+            elif self.a == 2:
+                e[4][6] = 'i'
+            elif self.a == 3:
+                e[4][9] = 'g'
+            elif self.a == 4:
+                e[4][12] = 'p'
+            with open('all_levels/menu/menu_trophies', 'wt', encoding='utf8') as file:
+                for i in e:
+                    print(''.join(i), file=file)
+            self.kill()
+
+
+class Portal(AnimatedSprite):
+    def update(self, *args):
+        global cur_level
+        self.max_fps = fps // 10
+        if self.cur_frame == 80 and self.pause < 50:
+            self.pause += 1
+        else:
+            if not self.fps:
+                self.cur_frame = (self.cur_frame + 1) % len(self.frames)
+                self.image = self.frames[self.cur_frame]
+                ####################################################
+                if pygame.sprite.collide_mask(self, hero) and menu_page != 'all_levels/results' and hero.right_bottom_x >= self.rect.centerx:
+                    end()
+                    ####################################################
+            self.fps = (self.fps + 1) % self.max_fps
+            self.pause = 0
+
+
+class Exit(pygame.sprite.Sprite):
+    def __init__(self, group, x, y, n):
+        super().__init__(group)
+        if n == 'w':
+            self.image = load_image('rexit.png')
+        elif n == 'r':
+            self.image = load_image('lexit.png')
+        self.image = pygame.transform.scale(self.image, (140, 120))
+        self.rect = self.image.get_rect()
+        self.rect.x += x
+        self.rect.y += y
+        self.mask = pygame.mask.from_surface(self.image)
+        self.left_up_x = self.rect.x
+        self.left_up_y = self.rect.y
+        self.right_bottom_x = self.rect.x + self.rect.width
+        self.right_bottom_y = self.rect.y + self.rect.height
 
 
 if __name__ == '__main__':
@@ -633,13 +741,12 @@ if __name__ == '__main__':
         coin_image = pygame.transform.scale(coin_image, (880, 80))
         blast_image = load_image("blast2.png", -1)
         blast_image = pygame.transform.scale(blast_image, (720, 720))
+        portal_image = load_image("portal.png", -1)
+        portal_image = pygame.transform.scale(portal_image, (500, 200))
         clock = pygame.time.Clock()
         ground = Ground(grounds)
         hero = Hero(characters)
-        #number = Numbers(numbers)
-        #############
         load_level(menu_page)
-        #load_level(f'all_levels/Copy/{cur_level[1]}')
         sky = Sky(backgrounds)
         while running:
             for event in pygame.event.get():
@@ -657,20 +764,29 @@ if __name__ == '__main__':
                             i.update(event)
             screen.fill((255, 255, 255))
             backgrounds.draw(screen)
-            grounds.draw(screen)
+
             numbers.draw(screen)
-            characters.draw(screen)
-            characters.update()
-            prizes.draw(screen)
+            ####################################################
             monsters.draw(screen)
             monsters.update()
-            prizes.update()
-            co.draw(screen)
-            coins(screen)
+            ####################################################
             if location == 'menu':
                 others.draw(screen)
                 others.update()
-            men.draw(screen)
+            else:
+                men.draw(screen)
+            grounds.draw(screen)
+            characters.draw(screen)
+            characters.update()
+            prizes.draw(screen)
+            prizes.update()
+            co.draw(screen)
+            coins(screen)
+            if not main_channel.get_busy():
+                curent_sound_number = (curent_sound_number + 1) % 2
+                curent_sound = pygame.mixer.Sound(f"Data/music/{curent_sound_number}.mp3")
+                main_channel.play(curent_sound)
+
             bricks.draw(screen)
             pygame.display.flip()
             clock.tick(fps)
