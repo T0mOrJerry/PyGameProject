@@ -62,6 +62,7 @@ main_channel.play(curent_sound)
 main_channel.set_volume(0.3)
 jump_sound = pygame.mixer.Sound("Data/music/jump.mp3")
 death_sound = pygame.mixer.Sound("Data/music/mario-death.mp3")
+score = 0
 
 
 def load_image(name, colorkey=None):
@@ -173,6 +174,18 @@ def cost_print(screen, n, x, y, b):
     screen.blit(text, (text_x, text_y))
 
 
+def score_print(screen):
+    global text_w, text_h, money, score, location
+    font = pygame.font.Font('Data/copperplategothic_bold.ttf', 68)
+    with open('all_levels/menu/info', 'wt', encoding='utf-8') as file:
+         print(money, file=file)
+    text = font.render(f"You scored {score} coin(s)!", True, (0, 0, 0))
+    text_w = text.get_width()
+    text_h = text.get_height()
+    text_x = width // 2 - text_w // 2
+    text_y = 200
+    screen.blit(text, (text_x, text_y))
+
 def death():
     main_channel.pause()
     death_sound.play()
@@ -195,7 +208,9 @@ def death():
 
 def end():
     ###########################################
-    global menu_page, location
+    global menu_page, location, score, money
+    score = level_money
+    money = str(int(money) + score)
     monsters.draw(screen)
     characters.draw(screen)
     pygame.display.flip()
@@ -208,8 +223,6 @@ def end():
     hero.rect.x = width // 2 - hero.rect.width
     hero.rect.y = 500
     ###########################################
-
-
 
 
 class Sky(pygame.sprite.Sprite):
@@ -382,7 +395,7 @@ class Hero(pygame.sprite.Sprite):
             if self.rect.x <= 1 and (menu_page == 'all_levels/menu/menu_main' or menu_page == 'all_levels/results'):
                 if self.vx < 0:
                     self.vx = 0
-            if self.right_bottom_x >= width and (menu_page == 'all_levels/menu/menu_main' or menu_page == 'all_levels/results'):
+            if self.right_bottom_x >= width and menu_page == 'all_levels/menu/menu_main':
                 if self.vx > 0:
                     self.vx = 0
             if self.rect.x >= width:
@@ -468,10 +481,6 @@ class AnimatedSprite(pygame.sprite.Sprite):
                 level_money += 1
                 self.kill()
                 ##########
-                with open("all_levels/menu/info", "r") as f:
-                    money = int(f.readline())
-                with open("all_levels/menu/info", "w") as f:
-                    print(money + 1, file=f)
                 with open(f"all_levels/Copy/{cur_level[1]}", "r") as file:
                     lvl_c = file.readlines()
                 st = lvl_c.pop(self.pos_x)
@@ -764,7 +773,6 @@ if __name__ == '__main__':
                             i.update(event)
             screen.fill((255, 255, 255))
             backgrounds.draw(screen)
-
             numbers.draw(screen)
             ####################################################
             monsters.draw(screen)
@@ -786,7 +794,8 @@ if __name__ == '__main__':
                 curent_sound_number = (curent_sound_number + 1) % 2
                 curent_sound = pygame.mixer.Sound(f"Data/music/{curent_sound_number}.mp3")
                 main_channel.play(curent_sound)
-
+            if menu_page == 'all_levels/results':
+                score_print(screen)
             bricks.draw(screen)
             pygame.display.flip()
             clock.tick(fps)
