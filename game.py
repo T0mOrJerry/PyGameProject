@@ -49,6 +49,11 @@ with open('all_levels/menu/levels.csv', encoding="utf8") as csvfile:
     reader = csv.reader(csvfile, delimiter=';', quotechar='"')
     for index, row in enumerate(reader):
         levels.append(row)
+trophies = []
+with open('all_levels/menu/trophy.csv', encoding="utf8") as csvfile:
+    reader = csv.reader(csvfile, delimiter=';', quotechar='"')
+    for index, row in enumerate(reader):
+        trophies.append(row)
 clear_copy()
 
 
@@ -90,6 +95,10 @@ def load_level(name):
                 Skin(bricks, j * 80, i * 80 + 25, int(e[i][j]) - 1)
             elif e[i][j] in "lmhe":
                 LevelBrick(bricks, j * 80, i * 80 + 25, e[i][j])
+            elif e[i][j] == "s":
+                Star(bricks, j * 80, i * 80 + 25)
+            elif e[i][j] in "dbigp":
+                Trophy(bricks, j * 80, i * 80 + 25, e[i][j])
             elif e[i][j] == "&":
                 Blast(monsters, blast_image, 9, 9, j, i)
 
@@ -102,8 +111,6 @@ def kill_all():
     for i in others:
         i.kill()
     for i in monsters:
-        i.kill()
-    for i in men:
         i.kill()
 
 
@@ -196,7 +203,7 @@ class Gear(pygame.sprite.Sprite):
         self.image = Gear.image
         self.image = pygame.transform.scale(self.image, (80, 80))
         self.rect = self.image.get_rect()
-        self.rect = self.rect.move(9 * 80, 4 * 80 + 25)
+        self.rect = self.rect.move(10 * 80, 4 * 80 + 25)
         self.mask = pygame.mask.from_surface(self.image)
 
 
@@ -335,6 +342,12 @@ class Hero(pygame.sprite.Sprite):
             if self.rect.x <= 1 and menu_page != 'all_levels/menu/menu_main':
                 menu_page = 'all_levels/menu/menu_main'
                 reload_level()
+            if self.rect.x <= 1 and menu_page == 'all_levels/menu/menu_main':
+                if self.vx < 0:
+                    self.vx = 0
+            if self.right_bottom_x >= width and menu_page == 'all_levels/menu/menu_main':
+                if self.vx > 0:
+                    self.vx = 0
             if self.rect.x >= width:
                 menu_page = 'all_levels/menu/menu_main'
                 reload_level()
@@ -499,10 +512,7 @@ class LevelBrick(pygame.sprite.Sprite):
 
 
     def update(self, *args):
-        global money
-        if args and args[0].type == pygame.MOUSEBUTTONDOWN:
-            if self.rect.collidepoint(args[0].pos[0], args[0].pos[1]):
-                global menu_page, location, cur_level
+        global menu_page, location, cur_level
         if pygame.sprite.collide_mask(self, hero):
             kill_all()
             location = 'level'
@@ -540,6 +550,7 @@ class MenuIcon(pygame.sprite.Sprite):
                 if self.rect.collidepoint(args[0].pos[0], args[0].pos[1]):
                     menu_page = 'all_levels/menu/menu_level'
                     location = 'menu'
+                    self.kill()
                     reload_level()
 
 
@@ -557,6 +568,62 @@ class Blast(AnimatedSprite):
                     death()
             self.fps = (self.fps + 1) % self.max_fps
             self.pause = 0
+
+
+class Star(pygame.sprite.Sprite):
+    image = load_image("star.png", -1)
+
+    def __init__(self, group, x, y):
+        super().__init__(group)
+        self.image = Star.image
+        self.image = pygame.transform.scale(self.image, (80, 80))
+        self.rect = self.image.get_rect()
+        self.rect.x += x
+        self.rect.y += y
+        self.mask = pygame.mask.from_surface(self.image)
+        self.left_up_x = self.rect.x
+        self.left_up_y = self.rect.y
+        self.right_bottom_x = self.rect.x + self.rect.width
+        self.right_bottom_y = self.rect.y + self.rect.height
+
+    def update(self, *args):
+        global menu_page
+        if pygame.sprite.collide_mask(self, hero):
+            menu_page = 'all_levels/menu/menu_trophies'
+            reload_level()
+
+
+class Trophy(pygame.sprite.Sprite):
+
+    def __init__(self, group, x, y, n):
+        super().__init__(group)
+        if n == 'd':
+            self.a = 0
+        elif n == 'b':
+            self.a = 1
+        elif n == 'i':
+            self.a = 2
+        elif n == 'g':
+            self.a = 3
+        else:
+            self.a = 4
+        self.page = trophies[self.a]
+        self.image = load_image(self.page[2], -1)
+        self.image = pygame.transform.scale(self.image, (80, 80))
+        self.rect = self.image.get_rect()
+        self.rect.x += x
+        self.rect.y += y
+        self.mask = pygame.mask.from_surface(self.image)
+        self.left_up_x = self.rect.x
+        self.left_up_y = self.rect.y
+        self.right_bottom_x = self.rect.x + self.rect.width
+        self.right_bottom_y = self.rect.y + self.rect.height
+
+
+    def update(self, *args):
+        global menu_page, location, cur_level
+        if pygame.sprite.collide_mask(self, hero) and self.a != 0:
+            full_levelname = os.path.join(f'all_levels/', f'{cur_level[0]}/level{cur_level[0]}.{cur_level[1]}')
 
 
 if __name__ == '__main__':
@@ -603,8 +670,6 @@ if __name__ == '__main__':
             if location == 'menu':
                 others.draw(screen)
                 others.update()
-            else:
-                men.draw(screen)
             men.draw(screen)
             bricks.draw(screen)
             pygame.display.flip()
