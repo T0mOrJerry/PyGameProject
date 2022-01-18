@@ -6,7 +6,9 @@ import csv
 
 
 def clear_copy():
-    copy_level = os.listdir(f"all_levels/{cur_level[0]}")[1:]
+    copy_level = os.listdir(f"all_levels/{cur_level[0]}")
+    if 'level' not in copy_level[0]:
+        copy_level = copy_level[1:]
     copy_level.sort(key=lambda x: int(x[-1]))
     for i in range(len(copy_level)):
         shutil.copy(f"all_levels/{cur_level[0]}/{copy_level[i]}", f'all_levels/Copy/{i + 1}')
@@ -36,7 +38,7 @@ feps = pygame.sprite.Group()
 location = 'menu'
 fps = 120
 jump_height = 110
-cur_level = (1, 1)
+cur_level = (3, 1)
 menu_page = 'all_levels/menu/menu_main'
 level_money = 0
 li = []
@@ -248,7 +250,7 @@ def settings_print(screen):
 def death():
     main_channel.pause()
     death_sound.play()
-    global cur_level
+    global cur_level, level_money
     a = hero.image
     kill_all()
     hero.jump = False
@@ -258,6 +260,8 @@ def death():
     pygame.display.flip()
     pygame.time.wait(2000)
     kill_all()
+    clear_copy()
+    level_money = 0
     load_level("all_levels/Copy/1")
     cur_level = (cur_level[0], 1)
     hero.image = a
@@ -739,7 +743,7 @@ class Trophy(pygame.sprite.Sprite):
         self.right_bottom_y = self.rect.y + self.rect.height
 
     def update(self):
-        global menu_page, location, cur_level
+        global menu_page, location, cur_level, level_trophy
         if pygame.sprite.collide_mask(self, hero) and menu_page != 'all_levels/menu/menu_trophies':
             prize_sound.play()
             full_levelname = os.path.join(f'all_levels/', f'{cur_level[0]}/level{cur_level[0]}.{cur_level[1]}')
