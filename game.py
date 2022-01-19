@@ -742,7 +742,7 @@ class Trophy(pygame.sprite.Sprite):
         self.right_bottom_x = self.rect.x + self.rect.width
         self.right_bottom_y = self.rect.y + self.rect.height
 
-    def update(self):
+    def update(self, *args):
         global menu_page, location, cur_level, level_trophy
         if pygame.sprite.collide_mask(self, hero) and menu_page != 'all_levels/menu/menu_trophies':
             prize_sound.play()
